@@ -1,1 +1,2 @@
-# facies_classification
+## Facies Classification
+This is a demonstration of using a machine learning algorithm (support vector machine) to assign facies to well log data.  Training data has been assembled based on expert core description combined with wireline data from nine wells.  This data is used to train an SVM to indentify facies based only on wireline data.  This is based on a class exercise from the University of Kansas that can be [found online](http://www.people.ku.edu/~gbohling/EECS833/).
