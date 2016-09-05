@@ -53,18 +53,18 @@ Facies|Description                |Label|Adjacent Facies
 3     |Non-marine fine siltstone  |FSiS | 2
 4     |Marine siltstone and shale |SiSh | 5
 5     |Mudstone                   |MS   | 4,6
-6     |Wackestone                 |WS   | 5,7
+6     |Wackestone                 |WS   | 5,7,8
 7     |Dolomite                   |D    | 6,8
 8     |Packstone-grainstone       |PS   | 6,7,9
 9     |Phylloid-algal bafflestone |BS   | 7,8
 
 **Table 2:** Facies labels with their descriptions.
 
-In order to evaluate the accuracy of the classifier, we will remove one well from the training set so that we can perform a blind test later.
+In order to evaluate the accuracy of the classifier, we will remove one well from the training set so that we can compare the predicted and actual facies labels.
 
 ```python
->>> blind_well = training_data[training_data['Well Name'] == 'NOLAN']
->>> training_data = training_data[training_data['Well Name'] != 'NOLAN']
+>>> test_well = training_data[training_data['Well Name'] == 'SHANKLE']
+>>> training_data = training_data[training_data['Well Name'] != 'SHANKLE']
 ```
 
 Let's extract the feature vectors and the associated facies labels from the training dataset:
@@ -97,11 +97,11 @@ Many machine learning algorithms assume the feature data are normally distribute
 >>> scaled_features = scaler.transform(feature_vectors)
 ```
 
-The standard practice when training supervised learning algorithms is to remove some data from the training set in order to evaluate the performance of the classifier.  We have already removed data from a single well for this purpose.  It is useful to have a *cross validation* data set we can use to tune the parameters of the model.  `Scikit-learn` also includes a handy function to randomly split the training data into training and cross validation sets.  Let's use 10% of the data for the cross validation set.
+A standard practice when training supervised learning algorithms is to separate some data from the training set in order to evaluate the accuracy of the classifier.  We have already removed data from a single well for this purpose.  It is also useful to have a *cross validation* data set we can use to tune the parameters of the model.  `Scikit-learn` includes a handy function to randomly split the training data into subsets.  Let's use 10% of the data for the cross validation set.
 
 ```python
 >>> from sklearn.cross_validation import train_test_split
->>> X_train, X_test, y_train, y_test = train_test_split(
+>>> X_train, X_cv, y_train, y_cv = train_test_split(
         scaled_features, facies_labels, 
         test_size=0.1, random_state=42)
 ```
@@ -110,7 +110,7 @@ The standard practice when training supervised learning algorithms is to remove 
 
 Now we can use the conditioned dataset to train a support vector machine to classify facies.  The concept of a support vector machine is straightforward.  If the data was linearly separable, it would be easy to draw a boundaries between the input data points that identified distinct classes. Figure 1 suggests that our data is not linearly separable. Using a technique known as the 'kernel trick', the data is projected into a higher dimensional space where it is separable. Boundaries, or margins, can be drawn between the data in this space. These boundaries are generated during the training step. 
 
-The SVM implementation in `scikit-learn` (http://scikit-learn.org/stable/modules/svm.html) takes a number of important parameters. These can be used to control the learning rate and the specifics of the kernel functions. The choice of parameters can affect the accuracy of the classifier, and finding optimal parameter choices is an important step known as *model selection*.  See the notebook accompanying this article for more details on the model selection procedure used to obtain the parameter choices used here.
+The SVM implementation in `scikit-learn` (http://scikit-learn.org/stable/modules/svm.html) takes a number of important parameters. These can be used to control the learning rate and the specifics of the kernel functions. The choice of parameters can affect the accuracy of the classifier, and finding optimal parameter choices is an important step known as *model selection*.  A succession of models are created with different parameter values, and the combination with the lowest cross validation error is used for the classifier.  See the notebook accompanying this article for more details on the model selection procedure used to obtain the parameter choices used here.
 
 ```python
 >>> from sklearn import svm
@@ -128,59 +128,59 @@ That's it!  Now that the model has been trained on our data, we can use it to pr
 
 ## Evaluating the classifier
 
-To evaluate the accuracy of our classifier we will use the well we kept for a blind test, and compare the predicted facies with the actual ones.  We need to extract the facies labels and features of this dataset, and rescale the features using the same parameters used to resacle the training set.
+To evaluate the accuracy of our classifier we will use the well we kept for a blind test, and compare the predicted facies with the actual ones.  We need to extract the facies labels and features of this dataset, and rescale the features using the same parameters used to rescale the training set.
 
 ```python
->>> y_blind = blind_well['Facies']
->>> well_features = blind.drop(['Facies',
-                                'Formation',
-                                'Well Name',
-                                'Depth'],
-                               axis=1)
->>> X_blind = scaler.transform(well_features)
+>>> y_test = test_well['Facies']
+>>> well_features = test_well.drop(['Facies',
+                                    'Formation',
+                                    'Well Name',
+                                    'Depth'],
+                                   axis=1)
+>>> X_test = scaler.transform(well_features)
 ```
-Now we can use our trained classifier to predict facies labels for this well, and store the results in the `Prediction` column of the `blind_well` dataframe.
+Now we can use our trained classifier to predict facies labels for this well, and store the results in the `Prediction` column of the `test_well` dataframe.
 
 ```python
->>> y_pred = clf.predict(X_blind)
->>> blind_well['Prediction'] = y_pred
+>>> y_pred = clf.predict(X_test)
+>>> test_well['Prediction'] = y_pred
 ```
-Because we know the true facies labels of the vectors in the blind test set, we can use the results to evaluate the accuracy of the classifier on this well.
+Because we know the true facies labels of the vectors in the test dataset, we can use the results to evaluate the accuracy of the classifier on this well.
 
 ```python
 >>> from sklearn.metrics import classification_report
 >>> target_names = ['SS', 'CSiS', 'FSiS', 'SiSh',
                     'MS', 'WS', 'D','PS', 'BS']
->>> print(classification_report(y_blind, y_pred,
+>>> print(classification_report(y_test, y_pred,
           target_names=target_names))
 ```
 
           Class|  precision|    recall|  f1-score|   support
           :---:|:---------:|:--------:|:--------:|:--------:    
-             SS|       0.00|      0.00|      0.00|         4
-           CSiS|       0.68|      0.61|      0.64|       118
-           FSiS|       0.43|      0.49|      0.46|        68
-           SiSh|       0.24|      0.14|      0.18|        28
-             MS|       0.46|      0.13|      0.20|        47
-             WS|       0.13|      0.30|      0.18|        30
-              D|       0.17|      0.25|      0.20|         4
-             PS|       0.71|      0.56|      0.63|       116
+             SS|       0.30|      0.08|      0.12|        89
+           CSiS|       0.36|      0.72|      0.48|        89
+           FSiS|       0.62|      0.54|      0.58|       117
+           SiSh|       0.25|      0.29|      0.27|         7
+             MS|       0.17|      0.11|      0.13|        19
+             WS|       0.66|      0.54|      0.59|        71
+              D|       0.71|      0.29|      0.42|        17
+             PS|       0.41|      0.60|      0.49|        40
              BS|       0.00|      0.00|      0.00|         0
-    avg / total|       0.54|      0.46|      0.48|       415
+    avg / total|       0.47|      0.46|      0.43|       449
 
 **Table 3** Accuracy metrics for the test data set.
 
-Precision and recall are metrics that tell us how the classifier is performing for individual facies. Precision is the probability that, given a classification result for a sample, the sample actually belongs to that class. Recall is the probability that a sample will be correctly classified for a given class. For example, if the classifier predicts that an interval is sandstone (SS), there is an 80% probability that the interval is actually sandstone (precision). If an interval is actually sandstone, there is a 78% probability that it will be correctly classified (recall). The F1 score combines both accuracy and precision to give a single measure of relevancy of the classifier results.
+Precision and recall are metrics that tell us how the classifier is performing for individual facies. Precision is the probability that, given a classification result for a sample, the sample actually belongs to that class. Recall is the probability that a sample will be correctly classified for a given class. For example, if the classifier predicts that an interval is fine siltstone (FSiS), there is an 62% probability that the interval is actually sandstone (precision). If an interval is actually fine siltstone, there is a 54% probability that it will be correctly classified (recall). The F1 score combines both accuracy and precision to give a single measure of relevancy of the classifier results.
 
-It is interesting to note that if we count misclassification within adjacent facies as correct, the classifier has an overall F1 score of 0.83.
+Our classifier achieved an overall F1 score of 0.43 on the test well, so there is room for improvement.  It is interesting to note that if we count misclassification within adjacent facies as correct, the classifier has an overall F1 score of 0.88.
 
-Let's look at the classifier results in log plot form. Figure 2 is based on the plots described in Alessandro Amato del Monte's excellent tutorial from June 2015 of this series. The five logs used as features are plotted along with the predicted lithofacies class log.
+Let's look at the classifier results in log plot form. Figure 2 is based on the plots described in Alessandro Amato del Monte's excellent tutorial from June 2015 of this series. The five logs used as features are plotted along with the actual and predicted lithofacies class log.
 
 ![Results: Classification applied to well log](images/test_well.png)
 
 **Figure 2.** Well logs and facies classification results from a single well.
 
-This tutorial has provided a brief overview of a typical machine learning workflow; preparing a dataset, training a classifier and applying the results.  Libraries such as `scikit-learn` provide powerful algorithms that can be applied to problems in the geosciences with just a few lines of code.  You can find a more details, along with the data and code used for this tutorial at https://github.com/seg.
+This tutorial has provided a brief overview of a typical machine learning workflow; preparing a dataset, training a classifier and evaluating the model.  Libraries such as `scikit-learn` provide powerful algorithms that can be applied to problems in the geosciences with just a few lines of code.  You can find a more details, along with the data and code used for this tutorial at https://github.com/seg.
 
 ##References
 Amato del Monte, A., 2015. Seismic Petrophysics: Part 1, *The Leading Edge*, 34 (4). [doi:10.1190/tle34040440.1](http://dx.doi.org/10.1190/tle34040440.1)
