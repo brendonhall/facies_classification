@@ -12,12 +12,22 @@ def display_cm(cm, labels, hide_zeros=False,
     recall = np.diagonal(cm)/cm.sum(axis=1).astype('float')
     F1 = 2 * (precision * recall) / (precision + recall)
     
+    precision[np.isnan(precision)] = 0
+    recall[np.isnan(recall)] = 0
+    F1[np.isnan(F1)] = 0
+    
+    total_precision = np.sum(precision * cm.sum(axis=1)) / cm.sum(axis=(0,1))
+    total_recall = np.sum(recall * cm.sum(axis=1)) / cm.sum(axis=(0,1))
+    total_F1 = np.sum(F1 * cm.sum(axis=1)) / cm.sum(axis=(0,1))
+    #print total_precision
+    
     columnwidth = max([len(x) for x in labels]+[5]) # 5 is value length
     empty_cell = " " * columnwidth
     # Print header
     print "    " + " Pred",
     for label in labels: 
         print "%{0}s".format(columnwidth) % label,
+    print "%{0}s".format(columnwidth) % 'Total'
     print
     print "    " + " True"
     # Print rows
@@ -28,6 +38,7 @@ def display_cm(cm, labels, hide_zeros=False,
             if hide_zeros:
                 cell = cell if float(cm[i, j]) != 0 else empty_cell
             print cell,
+        print "%{0}d".format(columnwidth) % sum(cm[i,:])
         
         print
         
@@ -37,16 +48,19 @@ def display_cm(cm, labels, hide_zeros=False,
         for j in range(len(labels)):
             cell = "%{0}.2f".format(columnwidth) % precision[j]
             print cell,
+        print "%{0}.2f".format(columnwidth) % total_precision
         print
         print "   Recall",
         for j in range(len(labels)):
             cell = "%{0}.2f".format(columnwidth) % recall[j]
             print cell,
+        print "%{0}.2f".format(columnwidth) % total_recall
         print
         print "       F1",
         for j in range(len(labels)):
             cell = "%{0}.2f".format(columnwidth) % F1[j]
             print cell,
+        print "%{0}.2f".format(columnwidth) % total_F1
         print
     
                   

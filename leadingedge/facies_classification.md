@@ -60,6 +60,13 @@ Facies|Description                |Label|Adjacent Facies
 
 **Table 2:** Facies labels with their descriptions.
 
+In order to evaluate the accuracy of the classifier, we will remove one well from the training set so that we can perform a blind test later.
+
+```python
+>>> blind_well = training_data[training_data['Well Name'] == 'NOLAN']
+>>> training_data = training_data[training_data['Well Name'] != 'NOLAN']
+```
+
 Let's extract the feature vectors and the associated facies labels from the training dataset:
 
 ```python
@@ -90,13 +97,13 @@ Many machine learning algorithms assume the feature data are normally distribute
 >>> scaled_features = scaler.transform(feature_vectors)
 ```
 
-`Scikit-learn` also includes a handy function to randomly split the training data into training and test sets. The test set contains a small subset of feature vectors that are not used to train the network. Because we know the true facies labels for these examples, we can use the trained classifier to predict the facies for the test set and compare the results of the classifier to the actual facies and determine the accuracy of the model. Let's use 20% of the data for the test set.
+The standard practice when training supervised learning algorithms is to remove some data from the training set in order to evaluate the performance of the classifier.  We have already removed data from a single well for this purpose.  It is useful to have a *cross validation* data set we can use to tune the parameters of the model.  `Scikit-learn` also includes a handy function to randomly split the training data into training and cross validation sets.  Let's use 10% of the data for the cross validation set.
 
 ```python
 >>> from sklearn.cross_validation import train_test_split
 >>> X_train, X_test, y_train, y_test = train_test_split(
         scaled_features, facies_labels, 
-        test_size=0.2, random_state=42)
+        test_size=0.1, random_state=42)
 ```
 
 ## Training the classifier
@@ -116,64 +123,60 @@ Now we can train the classifier using the training set we created above.
 >>> clf.fit(X_train, y_train)
 ```
 
-That's it!  Now that the model has been trained on our data, we can use it to predict the facies of the feature vectors in the test set we generated above.  
+That's it!  Now that the model has been trained on our data, we can use it to predict the facies of any well with the same set of features as our training set.  We set aside a well for exactly this purpose.  
+
+
+## Evaluating the classifier
+
+To evaluate the accuracy of our classifier we will use the well we kept for a blind test, and compare the predicted facies with the actual ones.  We need to extract the facies labels and features of this dataset, and rescale the features using the same parameters used to resacle the training set.
 
 ```python
->>> y_pred = clf.predict(X_test)
+>>> y_blind = blind_well['Facies']
+>>> well_features = blind.drop(['Facies',
+                                'Formation',
+                                'Well Name',
+                                'Depth'],
+                               axis=1)
+>>> X_blind = scaler.transform(well_features)
 ```
+Now we can use our trained classifier to predict facies labels for this well, and store the results in the `Prediction` column of the `blind_well` dataframe.
 
-Because we know the true facies labels of the vectors in the test set, we can use the results to evaluate the accuracy of the classifier.
+```python
+>>> y_pred = clf.predict(X_blind)
+>>> blind_well['Prediction'] = y_pred
+```
+Because we know the true facies labels of the vectors in the blind test set, we can use the results to evaluate the accuracy of the classifier on this well.
 
 ```python
 >>> from sklearn.metrics import classification_report
 >>> target_names = ['SS', 'CSiS', 'FSiS', 'SiSh',
                     'MS', 'WS', 'D','PS', 'BS']
->>> print(classification_report(y_test, y_pred,
+>>> print(classification_report(y_blind, y_pred,
           target_names=target_names))
 ```
 
           Class|  precision|    recall|  f1-score|   support
           :---:|:---------:|:--------:|:--------:|:--------:    
-             SS|       0.80|      0.78|      0.79|        46
-           CSiS|       0.79|      0.82|      0.81|       153
-           FSiS|       0.78|      0.78|      0.78|       126
-           SiSh|       0.59|      0.86|      0.70|        28
-             MS|       0.77|      0.57|      0.66|        47
-             WS|       0.75|      0.74|      0.74|       100
-              D|       1.00|      0.55|      0.71|        22
-             PS|       0.73|      0.74|      0.74|        94
-             BS|       0.94|      1.00|      0.97|        31
-    avg / total|       0.78|      0.77|      0.77|       647
+             SS|       0.00|      0.00|      0.00|         4
+           CSiS|       0.68|      0.61|      0.64|       118
+           FSiS|       0.43|      0.49|      0.46|        68
+           SiSh|       0.24|      0.14|      0.18|        28
+             MS|       0.46|      0.13|      0.20|        47
+             WS|       0.13|      0.30|      0.18|        30
+              D|       0.17|      0.25|      0.20|         4
+             PS|       0.71|      0.56|      0.63|       116
+             BS|       0.00|      0.00|      0.00|         0
+    avg / total|       0.54|      0.46|      0.48|       415
 
 **Table 3** Accuracy metrics for the test data set.
 
 Precision and recall are metrics that tell us how the classifier is performing for individual facies. Precision is the probability that, given a classification result for a sample, the sample actually belongs to that class. Recall is the probability that a sample will be correctly classified for a given class. For example, if the classifier predicts that an interval is sandstone (SS), there is an 80% probability that the interval is actually sandstone (precision). If an interval is actually sandstone, there is a 78% probability that it will be correctly classified (recall). The F1 score combines both accuracy and precision to give a single measure of relevancy of the classifier results.
 
-It is interesting to note that if we count misclassification within adjacent facies as correct, the classifier has an overall F1 score of 0.91.
-
-## Applying the classifier
-
-Now that we have a trained facies classification model we can use it to identify facies in wells that do not have lithofacies descriptions. In this case, we will apply the classifier to two unclassified wells, but we could use it on any number of wells for which we have the same set of well logs for input. The data is located in a file called `nofacies_data.csv`, and once it is loaded we drop some columns and are left with the features we used to train the classifier.  We then rescale the data using the same parameters used to rescale the training set.
-
-```python
->>> well_data = pd.read_csv('nofacies_data.csv')
->>> well_features = well_data.drop(['Formation',
-                                    'Well Name',
-                                    'Depth'],
-                                   axis=1)
->>> well_scaled = scaler.transform(well_features)
-```
-
-Finally we use our trained classifier to predict facies labels for the unclassified data, and store the results in a `Facies` column of the `well_data` dataframe.
-
-```python
->>> facies_labels = clf.predict(well_features_scaled)
->>> well_data['Facies'] = facies_labels
-```
+It is interesting to note that if we count misclassification within adjacent facies as correct, the classifier has an overall F1 score of 0.83.
 
 Let's look at the classifier results in log plot form. Figure 2 is based on the plots described in Alessandro Amato del Monte's excellent tutorial from June 2015 of this series. The five logs used as features are plotted along with the predicted lithofacies class log.
 
-![Results: Classification applied to well log](images/stuart.png)
+![Results: Classification applied to well log](images/test_well.png)
 
 **Figure 2.** Well logs and facies classification results from a single well.
 
