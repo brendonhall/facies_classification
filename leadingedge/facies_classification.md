@@ -16,10 +16,10 @@ The dataset consists of seven features (five wireline log measurements and two i
 
 ```python
 >>> import pandas as pd
->>> training_data = pd.read_csv('training_data.csv')
+>>> data = pd.read_csv('training_data.csv')
 ```
 
-We can use `training_data.describe()` to provide a quick overview of the statistical distribution of the training data:
+We can use `data.describe()` to provide a quick overview of the statistical distribution of the training data:
 
 |     |Facies|Depth  |GR    |ILD_log10|DeltaPHI|PHIND|PE  |NM_M|RELPOS|
 |:---:|:----:|:-----:|:----:|:-------:|:------:|:---:|:--:|:--:|:----:|   
@@ -63,16 +63,16 @@ Facies|Description                |Label|Adjacent Facies
 In order to evaluate the accuracy of the classifier, we will remove one well from the training set so that we can compare the predicted and actual facies labels.
 
 ```python
->>> test_well = training_data[training_data['Well Name'] == 'SHANKLE']
->>> training_data = training_data[training_data['Well Name'] != 'SHANKLE']
+>>> test_well = data[data['Well Name'] == 'SHANKLE']
+>>> data = data[data['Well Name'] != 'SHANKLE']
 ```
 
 Let's extract the feature vectors and the associated facies labels from the training dataset:
 
 ```python
 >>> features = ['GR', 'ILD_log10', 'DeltaPHI', 'PHIND','PE','NM_M', 'RELPOS']
->>> feature_vectors = training_data[features]
->>> facies_labels = training_data['Facies']
+>>> feature_vectors = data[features]
+>>> facies_labels = data['Facies']
 ```
 
 Crossplots are a familiar tool to visualize how two properties vary with rock type. This dataset contains 5 log measurements, and we can employ the very useful `seaborn` library (Waskom et al. 2016) to create a matrix of cross plots to visualize the variation between the log measurements in the dataset.  
@@ -92,18 +92,18 @@ Each pane in Figure 1 shows the relationship between two of the variables on the
 Many machine learning algorithms assume the feature data are normally distributed (i.e. Gaussian with zero mean and unit variance). Table 1 shows us that this is not the case with our training data. We will condition, or *standardize* the training data so that it has this property. The same factors used to standardize the training set must be applied to any subsequent dataset that will be classified. `Scikit-learn` includes a handy `StandardScalar` class that can be applied to the training set, and later used to standardize any input data.
 
 ```python
->>> from sklearn import preprocessing
->>> scaler = preprocessing.StandardScaler().fit(feature_vectors)
+>>> from sklearn.preprocessing import StandardScalar
+>>> scaler = StandardScaler().fit(feature_vectors)
 >>> scaled_features = scaler.transform(feature_vectors)
 ```
 
-A standard practice when training supervised learning algorithms is to separate some data from the training set in order to evaluate the accuracy of the classifier.  We have already removed data from a single well for this purpose.  It is also useful to have a *cross validation* data set we can use to tune the parameters of the model.  `Scikit-learn` includes a handy function to randomly split the training data into subsets.  Let's use 10% of the data for the cross validation set.
+A standard practice when training supervised learning algorithms is to separate some data from the training set in order to evaluate the accuracy of the classifier.  We have already removed data from a single well for this purpose.  It is also useful to have a *cross validation* data set we can use to tune the parameters of the model.  `Scikit-learn` includes a handy function to randomly split the training data into subsets.  Let's use 5% of the data for the cross validation set.
 
 ```python
 >>> from sklearn.cross_validation import train_test_split
 >>> X_train, X_cv, y_train, y_cv = train_test_split(
         scaled_features, facies_labels, 
-        test_size=0.1, random_state=42)
+        test_size=0.05, random_state=42)
 ```
 
 ## Training the classifier
