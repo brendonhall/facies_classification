@@ -97,13 +97,13 @@ Many machine learning algorithms assume the feature data are normally distribute
 >>> scaled_features = scaler.transform(feature_vectors)
 ```
 
-A standard practice when training supervised learning algorithms is to separate some data from the training set in order to evaluate the accuracy of the classifier.  We have already removed data from a single well for this purpose.  It is also useful to have a *cross validation* data set we can use to tune the parameters of the model.  `Scikit-learn` includes a handy function to randomly split the training data into subsets.  Let's use 10% of the data for the cross validation set.
+A standard practice when training supervised learning algorithms is to separate some data from the training set in order to evaluate the accuracy of the classifier.  We have already removed data from a single well for this purpose.  It is also useful to have a *cross validation* data set we can use to tune the parameters of the model.  `Scikit-learn` includes a handy function to randomly split the training data into subsets.  Let's use 5% of the data for the cross validation set.
 
 ```python
 >>> from sklearn.cross_validation import train_test_split
 >>> X_train, X_cv, y_train, y_cv = train_test_split(
         scaled_features, facies_labels, 
-        test_size=0.1, random_state=42)
+        test_size=0.05, random_state=42)
 ```
 
 ## Training the classifier
